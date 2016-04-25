@@ -211,3 +211,5 @@ GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
 *.opendb
+/SeaDevils/output.txt
+/SeaDevils.VC.db

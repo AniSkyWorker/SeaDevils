@@ -6,47 +6,45 @@
 
 using namespace boost::numeric::ublas;
 
-class CButts
+class CLandfillAggregator
 {
 public:
-	CButts(unsigned & M, unsigned & N)
-		:M(M)
-		,N(N)
-		,butts(M + 2, N + 2)
+	CLandfillAggregator(unsigned & m_matrixRowsCount, unsigned & m_matrixColumnsCount)
+		:m_matrixRowsCount(m_matrixRowsCount)
+		,m_matrixColumnsCount(m_matrixColumnsCount)
+		,m_landfill(m_matrixRowsCount + 2, m_matrixColumnsCount + 2)
 	{
-		for (unsigned i = 0; i < butts.size1(); i++)
+		for (unsigned i = 0; i < m_landfill.size1(); i++)
 		{
-			butts(i, 0).first = -1;
-			butts(i, 0).second = -1;
+			m_landfill(i, 0).first = -1;
+			m_landfill(i, 0).second = -1;
 		}
-		for (unsigned i = 0; i < butts.size1(); i++)
+		for (unsigned i = 0; i < m_landfill.size1(); i++)
 		{
-			butts(i, butts.size2() - 1).first = -1;
-			butts(i, butts.size2() - 1).second = -1;
+			m_landfill(i, m_landfill.size2() - 1).first = -1;
+			m_landfill(i, m_landfill.size2() - 1).second = -1;
 		}
-		for (unsigned j = 0; j < butts.size2(); j++)
+		for (unsigned j = 0; j < m_landfill.size2(); j++)
 		{
-			butts(0, j).first = -1;
-			butts(0, j).second = -1;
+			m_landfill(0, j).first = -1;
+			m_landfill(0, j).second = -1;
 		}
-		for (unsigned j = 0; j < butts.size2(); j++)
+		for (unsigned j = 0; j < m_landfill.size2(); j++)
 		{
-			butts(butts.size1() - 1, j).first = -1;
-			butts(butts.size1() - 1, j).second = -1;
+			m_landfill(m_landfill.size1() - 1, j).first = -1;
+			m_landfill(m_landfill.size1() - 1, j).second = -1;
 		}
 	}
 
-	void DevilWave(unsigned i = 1, unsigned j = 1, int currentWeight = 1)
+	void RunDevilWave()
 	{
-		if (butts(i, j).first != -1)
+		if (m_landfill(1, 1).first != -1)
 		{
-			if ((butts(i, j).second > currentWeight + butts(i, j).first) || (butts(i, j).second == butts(i, j).first))
+			if ((m_landfill(1, 1).second > 1 + m_landfill(1, 1).first) || (m_landfill(1, 1).second == m_landfill(1, 1).first))
 			{
-				butts(i, j).second = currentWeight + butts(i, j).first;
-				DevilWave(i + 1, j, butts(i, j).second);
-				DevilWave(i, j + 1, butts(i, j).second);
-				DevilWave(i - 1, j, butts(i, j).second);
-				DevilWave(i, j - 1, butts(i, j).second);
+				m_landfill(1, 1).second = 1 + m_landfill(1, 1).first;
+				SpreadDevilWave(2, 1, m_landfill(1, 1).second);
+				SpreadDevilWave(1, 2, m_landfill(1, 1).second);
 			}
 		}
 	}
@@ -54,9 +52,9 @@ public:
 	void InitFromFile(std::ifstream & in)
 	{
 		char buffer;
-		for (unsigned i = 1; i < butts.size1() - 1; i++)
+		for (unsigned i = 1; i < m_landfill.size1() - 1; i++)
 		{
-			for (unsigned j = 1; j < butts.size2() - 1; j++)
+			for (unsigned j = 1; j < m_landfill.size2() - 1; j++)
 			{
 				in >> buffer;
 				while (buffer == '\n')
@@ -65,13 +63,13 @@ public:
 				}
 				if (buffer == '.')
 				{
-					butts(i, j).first = 1;
-					butts(i, j).second = 1;
+					m_landfill(i, j).first = 1;
+					m_landfill(i, j).second = 1;
 				}
 				if (buffer == '@')
 				{
-					butts(i, j).first = M*N;
-					butts(i, j).second = M*N;
+					m_landfill(i, j).first = m_matrixRowsCount*m_matrixColumnsCount;
+					m_landfill(i, j).second = m_matrixRowsCount*m_matrixColumnsCount;
 				}
 			}
 		}
@@ -79,26 +77,45 @@ public:
 
 	std::string GetMinPathCounts()
 	{
-		int fields = butts(M, N).second - 1;
-		int countOfWaterFields = fields / (M*N);
-		return std::to_string(countOfWaterFields) + ' ' + std::to_string(fields - (countOfWaterFields * M*N));
+		int fields = m_landfill(m_matrixRowsCount, m_matrixColumnsCount).second - 1;
+		int countOfWaterFields = fields / (m_matrixRowsCount*m_matrixColumnsCount);
+		return std::to_string(countOfWaterFields) + ' ' + std::to_string(fields - (countOfWaterFields * m_matrixRowsCount*m_matrixColumnsCount));
 	}
 
 private:
-	unsigned M;
-	unsigned N;
-	matrix<std::pair<int, int>> butts;
+	void SpreadDevilWave(unsigned i, unsigned j, int currentWeight)
+	{
+		if (m_landfill(i, j).first != -1)
+		{
+			if ((m_landfill(i, j).second > currentWeight + m_landfill(i, j).first) || (m_landfill(i, j).second == m_landfill(i, j).first))
+			{
+				m_landfill(i, j).second = currentWeight + m_landfill(i, j).first;
+				SpreadDevilWave(i + 1, j, m_landfill(i, j).second);
+				SpreadDevilWave(i, j + 1, m_landfill(i, j).second);
+				SpreadDevilWave(i - 1, j, m_landfill(i, j).second);
+				SpreadDevilWave(i, j - 1, m_landfill(i, j).second);
+			}
+		}
+	}
+
+	unsigned m_matrixRowsCount;
+	unsigned m_matrixColumnsCount;
+	matrix<std::pair<int, int>> m_landfill;
 };
 
 int main()
 {
 	std::ifstream in("input.txt");
+
 	unsigned M, N;
 	in >> M >> N;
-	CButts butts(M, N);
-	butts.InitFromFile(in);
-	butts.DevilWave();
+
+	CLandfillAggregator m_landfill(M, N);
+	m_landfill.InitFromFile(in);
+	m_landfill.RunDevilWave();
+
 	std::ofstream out("output.txt");
-	out << butts.GetMinPathCounts() << std::endl;
-    return 0;
+	out << m_landfill.GetMinPathCounts() << std::endl;
+
+	return 0;
 }
