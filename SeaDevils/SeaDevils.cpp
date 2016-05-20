@@ -3,6 +3,8 @@
 #include <boost/numeric/ublas/io.hpp>
 #include <iostream>
 #include <fstream>
+#include <queue>
+#include <SFML/Graphics.hpp>
 
 using namespace boost::numeric::ublas;
 
@@ -35,7 +37,79 @@ public:
 			m_landfill(m_landfill.size1() - 1, j).second = -1;
 		}
 	}
+	void Draw()
+	{
+		sf::RenderWindow window;
+		sf::ContextSettings settings;
+		settings.antialiasingLevel = 8;
+		matrix<sf::RectangleShape> rects(m_landfill.size1(), m_landfill.size2());
+		matrix<sf::Text> texts(m_landfill.size1(), m_landfill.size2());
+		window.create(sf::VideoMode(640, 640), "Shape Viewer", sf::Style::Default, settings);
+		window.setFramerateLimit(5);
+		RunDevilWave();
+		for (unsigned i = 0; i < rects.size1(); i++)
+		{
+			for (unsigned j = 0; j < rects.size2(); j++)
+			{
+				sf::RectangleShape rect(sf::Vector2f(window.getSize().x / rects.size1(), window.getSize().y / rects.size2()));
+				rect.setOutlineThickness(1.f);
+				rect.setOutlineColor(sf::Color::Black);
+				rect.setFillColor(m_landfill(i, j).first == -1 ? sf::Color::Red : m_landfill(i, j).first == 1 ? sf::Color::Green : sf::Color::Blue);
+				rect.setPosition(sf::Vector2f(i * window.getSize().x / rects.size1() + 1, j *window.getSize().y / rects.size2() + 1));
+				rects(i, j) = rect;
 
+			}
+
+		}
+		sf::Font font;
+		font.loadFromFile("Sansation.ttf");
+		for (unsigned i = 0; i < rects.size1(); i++)
+		{
+			for (unsigned j = 0; j < rects.size2(); j++)
+			{
+				sf::Text text(std::to_string(m_landfill(i, j).second), font,15);
+				text.setPosition(rects(i, j).getPosition());
+				text.setColor(sf::Color::Black);
+				texts(i, j) = text;
+			}
+		}
+		while (window.isOpen())
+		{
+
+			sf::Event event;
+			while (window.pollEvent(event))
+			{
+				if (event.type == sf::Event::Closed)
+				{
+					window.close();
+				}
+			}
+
+			window.clear(sf::Color::White);
+			if (!m_waveQueue.empty())
+			{
+				SpreadDevilWave();
+				for (unsigned i = 0; i < rects.size1(); i++)
+				{
+					for (unsigned j = 0; j < rects.size2(); j++)
+					{
+						texts(i, j).setString(std::to_string(m_landfill(i, j).second));
+						window.draw(rects(i, j));
+						window.draw(texts(i, j));
+					}
+				}
+			}
+			else
+			{
+				std::ofstream out("output.txt");
+				out << GetMinPathCounts() << std::endl;
+			}
+			
+			window.display();
+
+		}
+
+	}
 	void RunDevilWave()
 	{
 		if (m_landfill(1, 1).first != -1)
@@ -43,10 +117,11 @@ public:
 			if ((m_landfill(1, 1).second > 1 + m_landfill(1, 1).first) || (m_landfill(1, 1).second == m_landfill(1, 1).first))
 			{
 				m_landfill(1, 1).second = 1 + m_landfill(1, 1).first;
-				SpreadDevilWave(2, 1, m_landfill(1, 1).second);
-				SpreadDevilWave(1, 2, m_landfill(1, 1).second);
+				m_waveQueue.push(std::make_pair(std::make_pair(2, 1), m_landfill(1, 1).second));
+				m_waveQueue.push(std::make_pair(std::make_pair(1, 2), m_landfill(1, 1).second));
 			}
 		}
+		SpreadDevilWave();
 	}
 
 	void InitFromFile(std::ifstream & in)
@@ -83,17 +158,23 @@ public:
 	}
 
 private:
-	void SpreadDevilWave(unsigned i, unsigned j, int currentWeight)
+	void SpreadDevilWave()
 	{
-		if (m_landfill(i, j).first != -1)
+		if(!m_waveQueue.empty())
 		{
-			if ((m_landfill(i, j).second > currentWeight + m_landfill(i, j).first) || (m_landfill(i, j).second == m_landfill(i, j).first))
+			auto queue = m_waveQueue.front();
+			m_waveQueue.pop();
+			auto current = m_landfill(queue.first.first, queue.first.second);
+			if (current.first != -1)
 			{
-				m_landfill(i, j).second = currentWeight + m_landfill(i, j).first;
-				SpreadDevilWave(i + 1, j, m_landfill(i, j).second);
-				SpreadDevilWave(i, j + 1, m_landfill(i, j).second);
-				SpreadDevilWave(i - 1, j, m_landfill(i, j).second);
-				SpreadDevilWave(i, j - 1, m_landfill(i, j).second);
+				if (current.second > (queue.second + current.first) || current.second == current.first)
+				{
+					m_landfill(queue.first.first, queue.first.second).second = queue.second + current.first;
+					m_waveQueue.push({ {queue.first.first + 1, queue.first.second}, current.second });
+					m_waveQueue.push({ {queue.first.first, queue.first.second + 1}, current.second });
+					m_waveQueue.push({ {queue.first.first - 1, queue.first.second}, current.second });
+					m_waveQueue.push({ {queue.first.first, queue.first.second - 1}, current.second });
+				}
 			}
 		}
 	}
@@ -101,6 +182,7 @@ private:
 	unsigned m_matrixRowsCount;
 	unsigned m_matrixColumnsCount;
 	matrix<std::pair<int, int>> m_landfill;
+	std::queue<std::pair<std::pair<int, int>, int>> m_waveQueue;
 };
 
 int main()
@@ -112,10 +194,6 @@ int main()
 
 	CLandfillAggregator m_landfill(M, N);
 	m_landfill.InitFromFile(in);
-	m_landfill.RunDevilWave();
-
-	std::ofstream out("output.txt");
-	out << m_landfill.GetMinPathCounts() << std::endl;
-
+	m_landfill.Draw();
 	return 0;
 }
