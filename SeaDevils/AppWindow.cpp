@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "AppWindow.h"
 #include "tinyfiledialogs.h"
-#include "SeaDevils.cpp"
+#include "LandfillAggregator.h"
 #include <fstream>
 
 namespace
@@ -24,8 +24,7 @@ CAppWindow::CAppWindow()
 	setFramerateLimit(60);
 	setVerticalSyncEnabled(true);
 	SetState(State::WaitingInput);
-
-	m_font.loadFromFile("sansations.ttf");
+	m_font.loadFromFile("Sansation.ttf");
 }
 
 CAppWindow::~CAppWindow()
@@ -58,16 +57,6 @@ void CAppWindow::EnterLoop()
 	}
 }
 
-void CAppWindow::OnGraphAlgorithmStep(const std::string &dotCode)
-{
-	std::string tempPath = "graph.dot";
-	std::string nextPath = "frame_" + std::to_string(m_pendingFramePaths.size()) + ".png";
-	std::ofstream tempDot(tempPath);
-	tempDot << dotCode;
-	tempDot.close();
-
-}
-
 void CAppWindow::SetState(CAppWindow::State state)
 {
 	m_state = state;
@@ -84,37 +73,50 @@ void CAppWindow::OnRunningDemo()
 			SetState(State::WaitingOutput);
 		}
 	}
-	sf::Sprite sprite;
-	sprite.setTexture(m_activeFrame);
 
-	const sf::Vector2f spriteSize = { float(sprite.getTextureRect().width), float(sprite.getTextureRect().height) };
-	const sf::Vector2f windowSize = { float(getSize().x), float(getSize().y) };
-	const float scale = std::min(windowSize.x / spriteSize.x, windowSize.y / spriteSize.y);
-	sprite.setOrigin(spriteSize * 0.5f);
-	sprite.setPosition(windowSize * 0.5f);
-	sprite.setScale(scale, scale);
-
-	draw(sprite);
+	for (unsigned i = 0; i < m_visualElements->rects.size1(); i++)
+	{
+		for (unsigned j = 0; j < m_visualElements->rects.size2(); j++)
+		{
+			m_visualElements->texts(i, j).setString(std::to_string(m_aggregator->GetWaveLevel(i, j)));
+			draw(m_visualElements->rects(i, j));
+			draw(m_visualElements->texts(i, j));
+		}
+	}
 }
 
 void CAppWindow::RunAlgorithmDemo()
 {
 	m_aggregator->RunDevilWave();
 	SetState(State::RunningDemo);
-	SwitchNextFrame();
+
+	for (unsigned i = 0; i < m_visualElements->rects.size1(); i++)
+	{
+		for (unsigned j = 0; j < m_visualElements->rects.size2(); j++)
+		{
+			sf::RectangleShape rect(sf::Vector2f(getSize().x / m_visualElements->rects.size1(), getSize().y / m_visualElements->rects.size2()));
+			rect.setOutlineThickness(1.f);
+			rect.setOutlineColor(sf::Color::Black);
+			auto initValue = m_aggregator->GetWaveLevel(i, j);
+			rect.setFillColor(initValue == -1 ? sf::Color::Red : initValue == 1 ? sf::Color::Green : sf::Color::Blue);
+			rect.setPosition(sf::Vector2f(i * getSize().x / m_visualElements->rects.size1() + 1, j * getSize().y / m_visualElements->rects.size2() + 1));
+			m_visualElements->rects(i, j) = rect;
+
+			sf::Text text(std::to_string(m_aggregator->GetWaveLevel(i,j)), m_font, getSize().x / m_visualElements->texts.size1() / 2);
+			text.setPosition(m_visualElements->rects(i, j).getPosition());
+			text.setColor(sf::Color::Black);
+			m_visualElements->texts(i, j) = text;
+		}
+	}
 }
 
 bool CAppWindow::SwitchNextFrame()
 {
 	m_clock.restart();
-	if (m_pendingFramePaths.empty())
+	if (!m_aggregator->SpreadDevilWave())
 	{
 		return false;
 	}
-
-	m_activeFrame.loadFromFile(m_pendingFramePaths.front());
-	m_pendingFramePaths.pop_front();
-
 	return true;
 }
 
@@ -128,10 +130,14 @@ void CAppWindow::AskOpenInput()
 		return;
 	}
 
-	m_aggregator = std::make_unique<CLandfillAggregator>();
-
 	std::ifstream in(result);
+	unsigned int m, n;
+	in >> m >> n;
+	m_aggregator = std::make_unique<CLandfillAggregator>(m,n);
 	m_aggregator->InitFromFile(in);
+
+	m_visualElements = std::make_unique<SVisualElements>(m_aggregator->GetDimensions().first, m_aggregator->GetDimensions().second);
+	RunAlgorithmDemo();
 }
 
 void CAppWindow::AskSaveOutput()
