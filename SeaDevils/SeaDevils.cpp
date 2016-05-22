@@ -1,13 +1,16 @@
 #include "stdafx.h"
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/io.hpp>
-#include <iostream>
-#include <fstream>
-#include <queue>
-#include <SFML/Graphics.hpp>
+#include "AppMenu.h"
+#include "tinyfiledialogs.h"
 
 using namespace boost::numeric::ublas;
-
+namespace
+{
+	const unsigned WINDOW_WIDTH = 800;
+	const unsigned WINDOW_HEIGHT = 600;
+	const unsigned MENU_BAR_HEIGHT = 20;
+	const unsigned WINDOW_STYLE = sf::Style::Titlebar | sf::Style::Close;
+	const int FRAME_SWITCH_INTERVAL = 1000;
+}
 class CLandfillAggregator
 {
 public:
@@ -15,6 +18,7 @@ public:
 		:m_matrixRowsCount(m_matrixRowsCount)
 		,m_matrixColumnsCount(m_matrixColumnsCount)
 		,m_landfill(m_matrixRowsCount + 2, m_matrixColumnsCount + 2)
+		, rects(m_landfill.size1(), m_landfill.size2())
 	{
 		for (unsigned i = 0; i < m_landfill.size1(); i++)
 		{
@@ -36,16 +40,24 @@ public:
 			m_landfill(m_landfill.size1() - 1, j).first = -1;
 			m_landfill(m_landfill.size1() - 1, j).second = -1;
 		}
+
+		m_menu = std::make_unique<CAppMenu>("File");
+		m_menu->SetFrame(sf::FloatRect(0, 0, float(WINDOW_WIDTH), float(MENU_BAR_HEIGHT)));
+		m_menu->AddAction("Open...", std::bind(&CLandfillAggregator::AskOpenInput, this));
+		m_menu->AddAction("Save...", std::bind(&CLandfillAggregator::AskSaveOutput, this));
+		m_menu->SetActionEnabled(0, true);
 	}
+
 	void Draw()
 	{
 		sf::RenderWindow window;
 		sf::ContextSettings settings;
 		settings.antialiasingLevel = 8;
-		matrix<sf::RectangleShape> rects(m_landfill.size1(), m_landfill.size2());
+
+		
 		matrix<sf::Text> texts(m_landfill.size1(), m_landfill.size2());
 		window.create(sf::VideoMode(640, 640), "Shape Viewer", sf::Style::Default, settings);
-		window.setFramerateLimit(5);
+		window.setFramerateLimit(1);
 		RunDevilWave();
 		for (unsigned i = 0; i < rects.size1(); i++)
 		{
@@ -67,7 +79,7 @@ public:
 		{
 			for (unsigned j = 0; j < rects.size2(); j++)
 			{
-				sf::Text text(std::to_string(m_landfill(i, j).second), font,15);
+				sf::Text text(std::to_string(m_landfill(i, j).second), font, window.getSize().x / rects.size1() / 2);
 				text.setPosition(rects(i, j).getPosition());
 				text.setColor(sf::Color::Black);
 				texts(i, j) = text;
@@ -83,10 +95,11 @@ public:
 				{
 					window.close();
 				}
+				m_menu->OnEvent(event);
 			}
 
 			window.clear(sf::Color::White);
-			if (!m_waveQueue.empty())
+			/*if (!m_waveQueue.empty())
 			{
 				SpreadDevilWave();
 				for (unsigned i = 0; i < rects.size1(); i++)
@@ -103,8 +116,8 @@ public:
 			{
 				std::ofstream out("output.txt");
 				out << GetMinPathCounts() << std::endl;
-			}
-			
+			}*/
+			window.draw(*m_menu);
 			window.display();
 
 		}
@@ -169,19 +182,49 @@ private:
 			{
 				if (current.second > (queue.second + current.first) || current.second == current.first)
 				{
-					m_landfill(queue.first.first, queue.first.second).second = queue.second + current.first;
+					current.second = queue.second + current.first;
 					m_waveQueue.push({ {queue.first.first + 1, queue.first.second}, current.second });
 					m_waveQueue.push({ {queue.first.first, queue.first.second + 1}, current.second });
 					m_waveQueue.push({ {queue.first.first - 1, queue.first.second}, current.second });
 					m_waveQueue.push({ {queue.first.first, queue.first.second - 1}, current.second });
+					m_landfill(queue.first.first, queue.first.second) = current;
 				}
 			}
 		}
 	}
 
+	void AskOpenInput()
+	{
+		const char *filters[] = { "*.txt" };
+		char const *result = tinyfd_openFileDialog("Select input file", "", 1, filters, "", false);
+		// Пользователь отменил выбор файла.
+		if (result == nullptr)
+		{
+			return;
+		}
+
+		std::ifstream in(result);
+		InitFromFile(in);
+	}
+
+	void AskSaveOutput()
+	{
+		const char *filters[] = { "*.txt" };
+		char const *result = tinyfd_saveFileDialog("Select output file", "", 1, filters, "");
+		// Пользователь отменил выбор файла.
+		if (result == nullptr)
+		{
+			return;
+		}
+		std::ofstream out(result);
+		out << GetMinPathCounts();
+	}
+
 	unsigned m_matrixRowsCount;
 	unsigned m_matrixColumnsCount;
 	matrix<std::pair<int, int>> m_landfill;
+	matrix<sf::RectangleShape> rects;
+	std::unique_ptr<CAppMenu> m_menu;
 	std::queue<std::pair<std::pair<int, int>, int>> m_waveQueue;
 };
 

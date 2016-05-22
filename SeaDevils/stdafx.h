@@ -10,6 +10,12 @@
 #include <stdio.h>
 #include <tchar.h>
 
-
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/io.hpp>
+#include <iostream>
+#include <fstream>
+#include <queue>
+#include <SFML/Graphics.hpp>
+#include <functional>
 
 // TODO: reference additional headers your program requires here
