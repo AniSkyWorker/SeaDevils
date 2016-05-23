@@ -3,14 +3,8 @@
 #include "AppMenu.h"
 
 class CLandfillAggregator;
-using namespace boost::numeric::ublas;
+struct SVisualElements;
 
-struct SVisualElements
-{
-	SVisualElements(int i, int j) :texts(i, j), rects(i, j) {};
-	matrix<sf::Text> texts;
-	matrix<sf::RectangleShape> rects;
-};
 class CAppWindow : public sf::RenderWindow
 {
 public:
@@ -33,13 +27,14 @@ private:
 	bool SwitchNextFrame();
 	void AskOpenInput();
 	void AskSaveOutput();
+	void InitVisual();
 
 	State m_state = State::WaitingInput;
 	sf::Clock m_clock;
 	std::deque<std::string> m_pendingFramePaths;
 	sf::Font m_font;
 	std::unique_ptr<CLandfillAggregator> m_aggregator;
-	std::unique_ptr<SVisualElements> m_visualElements;
+	std::shared_ptr<SVisualElements> m_visualElements;
 	sf::Texture m_activeFrame;
 	std::unique_ptr<CAppMenu> m_menu;
 	

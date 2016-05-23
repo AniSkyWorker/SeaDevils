@@ -10,11 +10,11 @@ namespace
 	const unsigned WINDOW_HEIGHT = 600;
 	const unsigned MENU_BAR_HEIGHT = 20;
 	const unsigned WINDOW_STYLE = sf::Style::Titlebar | sf::Style::Close;
-	const int FRAME_SWITCH_INTERVAL = 1000;
+	const int FRAME_SWITCH_INTERVAL = 250;
 }
 
 CAppWindow::CAppWindow()
-	: sf::RenderWindow(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Prima Roads - RGR Sample", WINDOW_STYLE)
+	: sf::RenderWindow(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Sea Devils", WINDOW_STYLE)
 {
 	m_menu = std::make_unique<CAppMenu>("File");
 	m_menu->SetFrame(sf::FloatRect(0, 0, float(WINDOW_WIDTH), float(MENU_BAR_HEIGHT)));
@@ -74,40 +74,14 @@ void CAppWindow::OnRunningDemo()
 		}
 	}
 
-	for (unsigned i = 0; i < m_visualElements->rects.size1(); i++)
-	{
-		for (unsigned j = 0; j < m_visualElements->rects.size2(); j++)
-		{
-			m_visualElements->texts(i, j).setString(std::to_string(m_aggregator->GetWaveLevel(i, j)));
-			draw(m_visualElements->rects(i, j));
-			draw(m_visualElements->texts(i, j));
-		}
-	}
+	draw(*m_visualElements);
 }
 
 void CAppWindow::RunAlgorithmDemo()
 {
 	m_aggregator->RunDevilWave();
 	SetState(State::RunningDemo);
-
-	for (unsigned i = 0; i < m_visualElements->rects.size1(); i++)
-	{
-		for (unsigned j = 0; j < m_visualElements->rects.size2(); j++)
-		{
-			sf::RectangleShape rect(sf::Vector2f(getSize().x / m_visualElements->rects.size1(), getSize().y / m_visualElements->rects.size2()));
-			rect.setOutlineThickness(1.f);
-			rect.setOutlineColor(sf::Color::Black);
-			auto initValue = m_aggregator->GetWaveLevel(i, j);
-			rect.setFillColor(initValue == -1 ? sf::Color::Red : initValue == 1 ? sf::Color::Green : sf::Color::Blue);
-			rect.setPosition(sf::Vector2f(i * getSize().x / m_visualElements->rects.size1() + 1, j * getSize().y / m_visualElements->rects.size2() + 1));
-			m_visualElements->rects(i, j) = rect;
-
-			sf::Text text(std::to_string(m_aggregator->GetWaveLevel(i,j)), m_font, getSize().x / m_visualElements->texts.size1() / 2);
-			text.setPosition(m_visualElements->rects(i, j).getPosition());
-			text.setColor(sf::Color::Black);
-			m_visualElements->texts(i, j) = text;
-		}
-	}
+	InitVisual();
 }
 
 bool CAppWindow::SwitchNextFrame()
@@ -133,10 +107,12 @@ void CAppWindow::AskOpenInput()
 	std::ifstream in(result);
 	unsigned int m, n;
 	in >> m >> n;
+
 	m_aggregator = std::make_unique<CLandfillAggregator>(m,n);
 	m_aggregator->InitFromFile(in);
 
-	m_visualElements = std::make_unique<SVisualElements>(m_aggregator->GetDimensions().first, m_aggregator->GetDimensions().second);
+	m_visualElements = m_aggregator->GetPtrToVisual();
+	
 	RunAlgorithmDemo();
 }
 
@@ -151,4 +127,26 @@ void CAppWindow::AskSaveOutput()
 	}
 	std::ofstream out(result);
 	out << m_aggregator->GetMinPathCounts();
+}
+
+void CAppWindow::InitVisual()
+{
+	for (unsigned i = 0; i < m_visualElements->rects.size1(); i++)
+	{
+		for (unsigned j = 0; j < m_visualElements->rects.size2(); j++)
+		{
+			sf::RectangleShape rect(sf::Vector2f(static_cast<float>(getSize().x )/ m_visualElements->rects.size1(), static_cast<float>(getSize().y) / m_visualElements->rects.size2()));
+			rect.setOutlineThickness(1.f);
+			rect.setOutlineColor(sf::Color::Black);
+			auto initValue = m_aggregator->GetWaveLevel(i, j);
+			rect.setFillColor(initValue == -1 ? sf::Color::Red : initValue == 1 ? sf::Color::Green : sf::Color::Blue);
+			rect.setPosition(sf::Vector2f(static_cast<float>(j) * getSize().x / m_visualElements->rects.size1() + 1, static_cast<float>(i) * getSize().y / m_visualElements->rects.size2() + 1));
+			m_visualElements->rects(i, j) = rect;
+
+			sf::Text text(std::to_string(m_aggregator->GetWaveLevel(i, j)), m_font, getSize().x / m_visualElements->texts.size1() / 2);
+			text.setPosition(m_visualElements->rects(i, j).getPosition());
+			text.setColor(sf::Color::Black);
+			m_visualElements->texts(i, j) = text;
+		}
+	}
 }
